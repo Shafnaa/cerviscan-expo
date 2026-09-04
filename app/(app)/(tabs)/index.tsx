@@ -1,7 +1,6 @@
-import React from 'react';
-
 import { Ionicons } from '@expo/vector-icons';
 import { Link, Stack } from 'expo-router';
+import React from 'react';
 import { Image, ScrollView, Text, View } from 'react-native';
 
 import { Avatar, AvatarFallback } from '~/components/ui/avatar';

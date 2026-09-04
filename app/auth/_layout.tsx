@@ -1,9 +1,7 @@
+import { Redirect, Stack } from 'expo-router';
 import React from 'react';
 
-import { Redirect, Stack } from 'expo-router';
-
 import Spinner from '~/components/spinner';
-
 import { useAuth } from '~/providers/auth-provider';
 
 function AuthLayout() {
