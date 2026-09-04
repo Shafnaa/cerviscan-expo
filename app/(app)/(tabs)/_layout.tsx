@@ -1,7 +1,6 @@
-import React from 'react';
-
-import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import React from 'react';
 
 function TabLayout() {
   return (
@@ -30,9 +29,16 @@ function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="album/index"
+        name="record/index"
         options={{
           title: 'Albums',
+          tabBarIcon: ({ color }) => <Ionicons name="albums" size={30} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="model/index"
+        options={{
+          title: 'Models',
           tabBarIcon: ({ color }) => <Ionicons name="albums" size={30} color={color} />,
         }}
       />
