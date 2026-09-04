@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Stack } from 'expo-router';
-import { Controller, useForm } from 'react-hook-form';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as ImagePicker from 'expo-image-picker';
+import { Stack } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { z } from 'zod';
 
-import * as ImagePicker from 'expo-image-picker';
-
+import Spinner from '~/components/spinner';
+import { Button } from '~/components/ui/button';
 import {
   Card,
   CardContent,
@@ -17,20 +17,19 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
-import { Label } from '~/components/ui/label';
 import { Input } from '~/components/ui/input';
-import { Button } from '~/components/ui/button';
-
-import Spinner from '~/components/spinner';
-
+import { Label } from '~/components/ui/label';
 import { cn } from '~/lib/utils';
-
 import { useAuth } from '~/providers/auth-provider';
 
+type Patient = {
+  id: string;
+  name: string;
+};
+
 const scanFormScheme = z.object({
-  name: z.string().min(3, 'Name is required'),
-  dob: z.string().min(3, 'Date of birth is required'),
-  image: z.string().min(3, 'Image is required'),
+  patientId: z.string().min(3, 'Please select a patient from the list'),
+  imageExist: z.boolean().refine((v) => v === true, 'Image is required'),
 });
 
 export default function Scan() {
@@ -39,23 +38,62 @@ export default function Scan() {
     id: string;
     prediction: boolean;
   } | null>(null);
+  const [imageFile, setImageFile] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [patients, setPatients] = useState<Patient[] | null>(null);
+  const [patientQuery, setPatientQuery] = useState('');
 
   const scanForm = useForm({
     resolver: zodResolver(scanFormScheme),
     defaultValues: {
-      name: '',
-      dob: '',
-      image: '',
+      patientId: '',
+      imageExist: false,
     },
   });
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const response = await authAxios.get('/user');
+        setPatients(response.data.data);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+
+    fetchPatients();
+  }, []);
+
+  useEffect(() => {
+    if (patients && scanForm.getValues('patientId')) {
+      const match = patients.find((p) => p.id === scanForm.getValues('patientId'));
+      if (match) {
+        setPatientQuery(match.name);
+      }
+    }
+  }, [patients]);
 
   const handleSubmit = async (data: z.infer<typeof scanFormScheme>) => {
     try {
       const formData = new FormData();
 
-      formData.append('name', data.name);
-      formData.append('dob', data.dob);
-      formData.append('image', data.image);
+      formData.append('patient_id', data.patientId);
+
+      if (!imageFile) {
+        scanForm.setError('root', {
+          message: 'Please select an image to upload.',
+        });
+        return;
+      }
+
+      const localUri = imageFile.uri;
+      const fileName = imageFile.fileName ?? localUri.split('/').pop() ?? 'upload.jpeg';
+      const fileType = imageFile.mimeType || 'image/jpeg';
+
+      formData.append('image', {
+        uri: Platform.OS === 'android' ? localUri : localUri.replace('file://', ''),
+        name: fileName,
+        type: fileType,
+      } as any);
 
       const response = await authAxios.post('/record/create', formData, {
         headers: {
@@ -69,6 +107,7 @@ export default function Scan() {
       setResult({ id, prediction });
 
       scanForm.reset();
+      setPatientQuery('');
     } catch (error) {
       console.log(error);
 
@@ -93,14 +132,24 @@ export default function Scan() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
-      base64: true,
     });
 
-    if (!result.canceled && result.assets?.length > 0 && result.assets[0].base64) {
-      scanForm.setValue('image', result.assets[0].base64);
+    if (!result.canceled && result.assets?.length > 0) {
+      setImageFile(result.assets[0]);
+      scanForm.setValue('imageExist', true);
+      scanForm.trigger('imageExist');
     } else {
       alert('No image selected!');
     }
+  };
+
+  const filteredPatients = patientQuery
+    ? (patients?.filter((p) => p.name.toLowerCase().includes(patientQuery.toLowerCase())) ?? [])
+    : [];
+
+  const selectPatient = (patient: Patient) => {
+    setPatientQuery(patient.name);
+    scanForm.setValue('patientId', patient.id, { shouldValidate: true });
   };
 
   return (
@@ -113,48 +162,39 @@ export default function Scan() {
             <CardDescription>Upload the VIA image here to be processed.</CardDescription>
           </CardHeader>
           <CardContent className="flex-col gap-4">
-            <Controller
-              name="name"
-              control={scanForm.control}
-              render={({ field: { onChange, value } }) => (
-                <View className="flex-col gap-2">
-                  <Label className="" nativeID="name">
-                    Patient Name
-                  </Label>
-                  <Input
-                    placeholder="Patient Name"
-                    value={value}
-                    onChangeText={onChange}
-                    aria-labelledby="name"
-                  />
-                  {scanForm.formState.errors.name && (
-                    <Text className="text-red-500">{scanForm.formState.errors.name.message}</Text>
-                  )}
-                </View>
+            <View className="flex-col gap-2">
+              <Label nativeID="patientId">Patient</Label>
+              <View className="relative">
+                <Input
+                  placeholder="Search patient by name..."
+                  value={patientQuery}
+                  onChangeText={(text) => {
+                    setPatientQuery(text);
+                    if (scanForm.getValues('patientId')) {
+                      scanForm.setValue('patientId', '', { shouldValidate: true });
+                    }
+                  }}
+                  aria-labelledby="patientId"
+                />
+                {filteredPatients.length > 0 && (
+                  <View className="absolute left-0 right-0 top-full z-10 mt-1 rounded-lg border border-gray-200 bg-white shadow-md">
+                    {filteredPatients.map((patient) => (
+                      <Pressable
+                        key={patient.id}
+                        onPress={() => selectPatient(patient)}
+                        className="border-b border-gray-100 px-3 py-2.5 last:border-b-0">
+                        <Text className="text-sm">{patient.name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+              {scanForm.formState.errors.patientId && (
+                <Text className="text-red-500">{scanForm.formState.errors.patientId.message}</Text>
               )}
-            />
+            </View>
             <Controller
-              name="dob"
-              control={scanForm.control}
-              render={({ field: { onChange, value } }) => (
-                <View className="flex-col gap-2">
-                  <Label className="" nativeID="dob">
-                    Date of Birth
-                  </Label>
-                  <Input
-                    placeholder="Patient Name"
-                    value={value}
-                    onChangeText={onChange}
-                    aria-labelledby="dob"
-                  />
-                  {scanForm.formState.errors.dob && (
-                    <Text className="text-red-500">{scanForm.formState.errors.dob.message}</Text>
-                  )}
-                </View>
-              )}
-            />
-            <Controller
-              name="image"
+              name="imageExist"
               control={scanForm.control}
               render={({ field: { value } }) => (
                 <View className="flex-col gap-2">
@@ -162,9 +202,9 @@ export default function Scan() {
                     VIA Image
                   </Label>
                   <Pressable onPress={pickImage}>
-                    {value.length > 3 ? (
+                    {value ? (
                       <Image
-                        source={{ uri: 'data:image/jpeg;base64,' + value }}
+                        source={{ uri: imageFile?.uri }}
                         className="aspect-square w-full rounded-lg"
                         resizeMode="cover"
                       />
@@ -175,8 +215,10 @@ export default function Scan() {
                       </View>
                     )}
                   </Pressable>
-                  {scanForm.formState.errors.image && (
-                    <Text className="text-red-500">{scanForm.formState.errors.image.message}</Text>
+                  {scanForm.formState.errors.imageExist && (
+                    <Text className="text-red-500">
+                      {scanForm.formState.errors.imageExist.message}
+                    </Text>
                   )}
                 </View>
               )}
@@ -220,17 +262,7 @@ export default function Scan() {
                 <Label className="">VIA Image</Label>
                 <Image
                   source={{
-                    uri: `${process.env.EXPO_PUBLIC_BACKEND_URL}/static/process/upload/${result.id}.jpg`,
-                  }}
-                  className="aspect-square w-full rounded-lg"
-                  resizeMode="cover"
-                />
-              </View>
-              <View className="flex-col gap-2">
-                <Label className="">Gray Image</Label>
-                <Image
-                  source={{
-                    uri: `${process.env.EXPO_PUBLIC_BACKEND_URL}/static/process/gray/${result.id}.jpg`,
+                    uri: `${process.env.EXPO_PUBLIC_BACKEND_URL}/static/process/upload/${result.id}.jpeg`,
                   }}
                   className="aspect-square w-full rounded-lg"
                   resizeMode="cover"
@@ -240,7 +272,7 @@ export default function Scan() {
                 <Label className="">Mask Image</Label>
                 <Image
                   source={{
-                    uri: `${process.env.EXPO_PUBLIC_BACKEND_URL}/static/process/mask/${result.id}.jpg`,
+                    uri: `${process.env.EXPO_PUBLIC_BACKEND_URL}/static/process/mask/${result.id}.jpeg`,
                   }}
                   className="aspect-square w-full rounded-lg"
                   resizeMode="cover"
@@ -250,7 +282,7 @@ export default function Scan() {
                 <Label className="">Segmented Image</Label>
                 <Image
                   source={{
-                    uri: `${process.env.EXPO_PUBLIC_BACKEND_URL}/static/process/segmented/${result.id}.jpg`,
+                    uri: `${process.env.EXPO_PUBLIC_BACKEND_URL}/static/process/segmented/${result.id}.jpeg`,
                   }}
                   className="aspect-square w-full rounded-lg"
                   resizeMode="cover"

@@ -1,17 +1,19 @@
-import { useContext, createContext, type PropsWithChildren } from 'react';
 import axios, { AxiosInstance } from 'axios';
 import createAuthRefreshInterceptor, { AxiosAuthRefreshRequestConfig } from 'axios-auth-refresh';
+import { useContext, createContext, type PropsWithChildren } from 'react';
 
 import { useStorageState } from '~/hooks/use-storage-state';
 
 type AuthContextType = {
-  signIn: ({ username, password }: { username: string; password: string }) => void;
+  signIn: ({ email, password }: { email: string; password: string }) => void;
   signUp: ({
-    username,
+    name,
+    email,
     password,
     confirmPassword,
   }: {
-    username: string;
+    name: string;
+    email: string;
     password: string;
     confirmPassword: string;
   }) => void;
@@ -108,11 +110,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   return (
     <AuthContext.Provider
       value={{
-        signIn: async ({ username, password }: { username: string; password: string }) => {
+        signIn: async ({ email, password }: { email: string; password: string }) => {
           try {
             const formData = new FormData();
 
-            formData.append('username', username);
+            formData.append('email', email);
             formData.append('password', password);
 
             const response = await publicAxios.post('/auth/login', formData, {
@@ -135,20 +137,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
           }
         },
         signUp: async ({
-          username,
+          name,
+          email,
           password,
           confirmPassword,
         }: {
-          username: string;
+          name: string;
+          email: string;
           password: string;
           confirmPassword: string;
         }) => {
           try {
             const formData = new FormData();
 
-            formData.append('username', username);
+            formData.append('name', name);
+            formData.append('email', email);
             formData.append('password', password);
-            formData.append('confirm_password', confirmPassword);
+            formData.append('password_confirm', confirmPassword);
 
             const response = await publicAxios.post('/auth/register', formData, {
               headers: {

@@ -1,11 +1,12 @@
-import React from 'react';
-
-import { Link, Stack } from 'expo-router';
-import { Image, Text, View } from 'react-native';
-import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Link, Stack } from 'expo-router';
+import React from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { Image, Text, View } from 'react-native';
 import { z } from 'zod';
 
+import Spinner from '~/components/spinner';
+import { Button } from '~/components/ui/button';
 import {
   Card,
   CardContent,
@@ -14,16 +15,13 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
-import { Button } from '~/components/ui/button';
-import { Label } from '~/components/ui/label';
 import { Input } from '~/components/ui/input';
-
-import Spinner from '~/components/spinner';
-
+import { Label } from '~/components/ui/label';
 import { useAuth } from '~/providers/auth-provider';
 
 const loginFormScheme = z.object({
-  username: z.string().min(3, 'Username is required'),
+  name: z.string().min(3, 'Name is required'),
+  email: z.string().email('Invalid email address').min(1, 'Email is required'),
   password: z.string().min(8, 'Password is required'),
   confirmPassword: z.string().min(8, 'Confirm Password is required'),
 });
@@ -34,7 +32,8 @@ export default function Login() {
   const loginForm = useForm({
     resolver: zodResolver(loginFormScheme),
     defaultValues: {
-      username: '',
+      name: '',
+      email: '',
       password: '',
       confirmPassword: '',
     },
@@ -57,8 +56,6 @@ export default function Login() {
       loginForm.setError('root', {
         message: 'Something went wrong',
       });
-
-      return;
     }
   };
 
@@ -79,22 +76,40 @@ export default function Login() {
           <CardContent className="flex-col gap-4">
             <Controller
               control={loginForm.control}
-              name="username"
+              name="name"
               render={({ field: { onChange, value } }) => (
                 <View className="flex-col gap-2">
-                  <Label className="" nativeID="username">
-                    Username
+                  <Label className="" nativeID="name">
+                    Name
                   </Label>
                   <Input
-                    placeholder="Usename"
+                    placeholder="Name"
                     value={value}
                     onChangeText={onChange}
-                    aria-labelledby="username"
+                    aria-labelledby="name"
                   />
-                  {loginForm.formState.errors.username && (
-                    <Text className="text-red-500">
-                      {loginForm.formState.errors.username.message}
-                    </Text>
+                  {loginForm.formState.errors.name && (
+                    <Text className="text-red-500">{loginForm.formState.errors.name.message}</Text>
+                  )}
+                </View>
+              )}
+            />
+            <Controller
+              control={loginForm.control}
+              name="email"
+              render={({ field: { onChange, value } }) => (
+                <View className="flex-col gap-2">
+                  <Label className="" nativeID="email">
+                    Email
+                  </Label>
+                  <Input
+                    placeholder="Email"
+                    value={value}
+                    onChangeText={onChange}
+                    aria-labelledby="email"
+                  />
+                  {loginForm.formState.errors.email && (
+                    <Text className="text-red-500">{loginForm.formState.errors.email.message}</Text>
                   )}
                 </View>
               )}
