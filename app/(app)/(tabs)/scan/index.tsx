@@ -17,7 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
-import { Input } from '~/components/ui/input';
+import { Combobox } from '~/components/ui/combobox';
 import { Label } from '~/components/ui/label';
 import { cn } from '~/lib/utils';
 import { useAuth } from '~/providers/auth-provider';
@@ -40,7 +40,6 @@ export default function Scan() {
   } | null>(null);
   const [imageFile, setImageFile] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [patients, setPatients] = useState<Patient[] | null>(null);
-  const [patientQuery, setPatientQuery] = useState('');
 
   const scanForm = useForm({
     resolver: zodResolver(scanFormScheme),
@@ -49,6 +48,13 @@ export default function Scan() {
       imageExist: false,
     },
   });
+
+  const patientItems = React.useMemo(
+    () => patients?.map((p) => ({ value: p.id, label: p.name })) ?? [],
+    [patients]
+  );
+
+  const patientId = scanForm.watch('patientId');
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -62,15 +68,6 @@ export default function Scan() {
 
     fetchPatients();
   }, []);
-
-  useEffect(() => {
-    if (patients && scanForm.getValues('patientId')) {
-      const match = patients.find((p) => p.id === scanForm.getValues('patientId'));
-      if (match) {
-        setPatientQuery(match.name);
-      }
-    }
-  }, [patients]);
 
   const handleSubmit = async (data: z.infer<typeof scanFormScheme>) => {
     try {
@@ -107,7 +104,6 @@ export default function Scan() {
       setResult({ id, prediction });
 
       scanForm.reset();
-      setPatientQuery('');
     } catch (error) {
       console.log(error);
 
@@ -143,15 +139,6 @@ export default function Scan() {
     }
   };
 
-  const filteredPatients = patientQuery
-    ? (patients?.filter((p) => p.name.toLowerCase().includes(patientQuery.toLowerCase())) ?? [])
-    : [];
-
-  const selectPatient = (patient: Patient) => {
-    setPatientQuery(patient.name);
-    scanForm.setValue('patientId', patient.id, { shouldValidate: true });
-  };
-
   return (
     <>
       <Stack.Screen options={{ title: 'Go Scan' }} />
@@ -164,31 +151,13 @@ export default function Scan() {
           <CardContent className="flex-col gap-4">
             <View className="flex-col gap-2">
               <Label nativeID="patientId">Patient</Label>
-              <View className="relative">
-                <Input
-                  placeholder="Search patient by name..."
-                  value={patientQuery}
-                  onChangeText={(text) => {
-                    setPatientQuery(text);
-                    if (scanForm.getValues('patientId')) {
-                      scanForm.setValue('patientId', '', { shouldValidate: true });
-                    }
-                  }}
-                  aria-labelledby="patientId"
-                />
-                {filteredPatients.length > 0 && (
-                  <View className="absolute left-0 right-0 top-full z-10 mt-1 rounded-lg border border-gray-200 bg-white shadow-md">
-                    {filteredPatients.map((patient) => (
-                      <Pressable
-                        key={patient.id}
-                        onPress={() => selectPatient(patient)}
-                        className="border-b border-gray-100 px-3 py-2.5 last:border-b-0">
-                        <Text className="text-sm">{patient.name}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-              </View>
+              <Combobox
+                items={patientItems}
+                value={patientId}
+                disabled={!patients}
+                placeholder="Search patient by name..."
+                onValueChange={(v) => scanForm.setValue('patientId', v, { shouldValidate: true })}
+              />
               {scanForm.formState.errors.patientId && (
                 <Text className="text-red-500">{scanForm.formState.errors.patientId.message}</Text>
               )}

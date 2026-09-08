@@ -1,6 +1,7 @@
 import '~/global.css';
 
 import { Theme, ThemeProvider, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { PortalHost } from '@rn-primitives/portal';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as React from 'react';
@@ -51,6 +52,7 @@ export default function RootLayout() {
       <StatusBar style={isDarkColorScheme ? 'light' : 'dark'} />
       <AuthProvider>
         <Slot />
+        <PortalHost />
       </AuthProvider>
     </ThemeProvider>
   );
